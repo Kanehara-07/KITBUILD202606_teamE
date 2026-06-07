@@ -2,4 +2,4 @@
 Hello Kindai
 Hello KDIX
 I'm sleepy now
-THE FOREST KNOWSs
+THE FOREST KNOWS
