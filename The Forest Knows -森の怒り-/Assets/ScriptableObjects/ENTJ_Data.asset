@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c5ea52988a6bc401e9f78a8484174555, type: 3}
+  m_Name: ENTJ_Data
+  m_EditorClassIdentifier: Assembly-CSharp::MBTICharacterData
+  characterName: 
+  mbtiType: 2
+  maxHP: 3000
+  attack: 2000
+  baseSpeed: 100
+  starRank: 1
