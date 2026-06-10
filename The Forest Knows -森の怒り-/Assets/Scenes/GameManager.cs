@@ -1,18 +1,18 @@
 using UnityEngine;
-using TMPro; // TextMeshProを使う
+using TMPro; // TextMeshProを使うため
 using System.Collections.Generic;
 using UnityEngine.SceneManagement;
 
 public class GameManager : MonoBehaviour {
-    public static GameManager Instance; // どこからでもアクセスできるようにする
+    public static GameManager Instance;
 
-    public List<MBTICharacterData> currentParty = new List<MBTICharacterData>(); // 現在のパーティ
-    public List<MBTICharacterData> allCharacterDatabase; // 全キャラのデータベース（Inspectorでセット）
+    public List<MBTICharacterData> currentParty = new List<MBTICharacterData>();
+    public List<MBTICharacterData> allCharacterDatabase;
 
-    public TMP_InputField mbtiInputField; // 入力欄
+    // ★ InputField から Dropdown に変更します
+    public TMP_Dropdown mbtiDropdown; 
 
     void Awake() {
-        // GameManagerをシーン移動で破壊されないようにする（シングルトン化）
         if (Instance == null) {
             Instance = this;
             DontDestroyOnLoad(gameObject);
@@ -23,18 +23,20 @@ public class GameManager : MonoBehaviour {
 
     // 決定ボタンを押した時に呼ばれる関数
     public void OnSubmitMBTI() {
-        string input = mbtiInputField.text.ToUpper().Trim(); // 入力を大文字にして空白削除
+        // ★ ドロップダウンで今選ばれている項目の「文字」を取得する
+        string selectedMBTI = mbtiDropdown.options[mbtiDropdown.value].text;
 
-        // データベースから入力されたMBTIと一致するキャラを探す
-        MBTICharacterData acquiredChar = allCharacterDatabase.Find(c => c.mbtiType.ToString() == input);
+        // データベースから一致するキャラを探す
+        MBTICharacterData acquiredChar = allCharacterDatabase.Find(c => c.mbtiType.ToString() == selectedMBTI);
 
         if (acquiredChar != null) {
             Debug.Log($"{acquiredChar.mbtiType}のキャラを入手しました！");
             currentParty.Add(acquiredChar); // パーティに追加
             
-            SceneManager.LoadScene("MapScene");
+            // マップ画面へ移動
+            SceneManager.LoadScene("MapScene"); 
         }else{
-            Debug.Log("正しいMBTIを入力してください");
+            Debug.Log("キャラクターデータが見つかりません。Databaseに登録されているか確認してください。");
         }
     }
 }

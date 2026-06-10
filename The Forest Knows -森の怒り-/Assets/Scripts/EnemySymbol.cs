@@ -8,7 +8,7 @@ public class EnemySymbol : MonoBehaviour {
     void OnTriggerEnter2D(Collider2D other) {
         // ぶつかってきた相手のタグが「Player」だった場合
         if (other.CompareTag("Player")) {
-            Debug.Clone($"【接触】敵とぶつかった！バトル開始！");
+            Debug.Log($"バトル開始");
             
             // バトル画面（前回作ったActionPanelなど）を表示する
             if (battleUI != null) {
