@@ -9,7 +9,7 @@ public class GameManager : MonoBehaviour {
     public List<MBTICharacterData> currentParty = new List<MBTICharacterData>();
     public List<MBTICharacterData> allCharacterDatabase;
 
-    // ★ InputField から Dropdown に変更します
+    // InputField から Dropdown に変更します
     public TMP_Dropdown mbtiDropdown; 
 
     void Awake() {
@@ -23,7 +23,7 @@ public class GameManager : MonoBehaviour {
 
     // 決定ボタンを押した時に呼ばれる関数
     public void OnSubmitMBTI() {
-        // ★ ドロップダウンで今選ばれている項目の「文字」を取得する
+        // ドロップダウンで今選ばれている項目の「文字」を取得する
         string selectedMBTI = mbtiDropdown.options[mbtiDropdown.value].text;
 
         // データベースから一致するキャラを探す
