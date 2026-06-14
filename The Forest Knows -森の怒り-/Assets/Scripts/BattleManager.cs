@@ -25,9 +25,6 @@ public class BattleManager : MonoBehaviour {
     void Start() {
         // パネルは最初隠す
         actionPanel.SetActive(false);
-
-        SetupTestBattle();
-        ProgressTurn();
     }
 
     void SetupTestBattle() {
@@ -101,4 +98,12 @@ public class BattleManager : MonoBehaviour {
         currentTurnCharacter.ResetActionValue();
         ProgressTurn(); 
     }
+    
+    // 外から呼び出されて、初めて戦闘をスタートする関数を新しく作る
+    public void BeginBattle() {
+        Debug.Log("--- 実際の戦闘を開始します！ ---");
+        SetupTestBattle();
+        ProgressTurn();
+    }
+    
 }

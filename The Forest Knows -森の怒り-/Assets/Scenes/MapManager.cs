@@ -2,91 +2,80 @@ using UnityEngine;
 using TMPro;
 using System.Collections.Generic;
 
-// エリアの種類を定義
 public enum AreaType { Battle, Event, Companion, Boss }
 
 public class MapManager : MonoBehaviour {
+    public static MapManager Instance;
+
     [Header("UIテキスト")]
-    public TextMeshProUGUI areaProgressText; // 「エリア 1 / 20」などの表示用
-    public TextMeshProUGUI areaTypeText;     // 「戦闘エリア」などの表示用
+    public TextMeshProUGUI areaProgressText;
+    public TextMeshProUGUI areaTypeText;
+
+    [Header("プレイヤー設定")]
+    public Transform playerTransform;
+    private Vector2 playerStartPosition = new Vector2(0f, -3f);
 
     [Header("エリア設定")]
     public int currentArea = 1;
     public int maxArea = 20;
-    
-    // 全20エリアの種類を記憶するリスト
-    private List<AreaType> mapRoute = new List<AreaType>();
+
+    // ★ 隠してある「BattleField」をインスペクターで繋ぐための枠
+    [Header("連動オブジェクト")]
+    public GameObject battleField; 
+
+    void Awake() {
+        Instance = this;
+    }
 
     void Start() {
-        GenerateMapRoute();
-        UpdateMapUI();
+        // 最初は敵フィールドを隠しておく
+        if (battleField != null) battleField.SetActive(false);
+
+        UpdateMapUI(AreaType.Companion);
     }
 
-    // 20エリア分のルートを自動生成する（ランダム生成）
-    void GenerateMapRoute() {
-        mapRoute.Clear();
-
-        for (int i = 1; i <= maxArea; i++) {
-            if (i == 1) {
-                // エリア1は「仲間エリア」（またはイベント）にして最初の準備期間にする
-                mapRoute.Add(AreaType.Companion);
-            }else if (i == maxArea){
-                // 最後のエリア20は必ずボス（大樹）
-                mapRoute.Add(AreaType.Boss);
-            }else{
-                // 2〜19エリアはランダム（戦闘かイベント）
-                // Random.Range(0, 2) で 0か1 がランダムで出る
-                AreaType randomType = (Random.Range(0, 2) == 0) ? AreaType.Battle : AreaType.Event;
-                mapRoute.Add(randomType);
-            }
-        }
-    }
-
-    // 次のエリアに進むボタンを押した時の処理
-    public void OnNextAreaButtonPressed() {
+    public void AdvanceToNextArea(AreaType selectedType) {
         if (currentArea >= maxArea) {
             Debug.Log("ゲームクリア");
             return;
         }
 
         currentArea++;
-        UpdateMapUI();
+        UpdateMapUI(selectedType);
+        TriggerAreaAction(selectedType);
 
-        // 到着したエリアの種類に応じて処理を分岐
-        AreaType currentType = mapRoute[currentArea - 1]; // 配列は0から始まるので -1
-        TriggerAreaAction(currentType);
+        if (playerTransform != null) {
+            playerTransform.position = playerStartPosition;
+        }
     }
 
-    // エリアごとの処理（現状はログを出すだけ。ここに後で戦闘画面を開くなどの処理を入れます）
     void TriggerAreaAction(AreaType type) {
+        // 次のエリアに移動した時、一旦敵フィールドは非表示にする
+        if (battleField != null) battleField.SetActive(false);
+
         switch (type) {
             case AreaType.Battle:
-                Debug.Log($"エリア {currentArea}: 戦闘エリア");
-                // ここでバトルUI（以前作ったもの）をオンにする
+                Debug.Log($"エリア {currentArea}: 敵が出現");
+                // ★ 戦闘エリアに入ったので、隠していた敵（BattleField）を自動で表示！
+                if (battleField != null) battleField.SetActive(true);
                 break;
+
             case AreaType.Event:
-                Debug.Log($"エリア {currentArea}: イベントエリア");
-                break;
-            case AreaType.Companion:
-                Debug.Log($"エリア {currentArea}: 仲間エリア");
-                break;
-            case AreaType.Boss:
-                Debug.Log($"エリア {currentArea}: ボスエリア");
+                Debug.Log($"エリア {currentArea}: イベント発生");
                 break;
         }
     }
 
-    // 画面の文字を更新する関数
-    void UpdateMapUI() {
-        areaProgressText.text = $"エリア {currentArea} / {maxArea}";
-        
-        // 現在のエリアの種類を日本語にして表示
-        AreaType currentType = mapRoute[currentArea - 1];
-        switch (currentType) {
-            case AreaType.Battle: areaTypeText.text = "種類：戦闘エリア"; break;
-            case AreaType.Event: areaTypeText.text = "種類：イベントエリア"; break;
-            case AreaType.Companion: areaTypeText.text = "種類：仲間エリア"; break;
-            case AreaType.Boss: areaTypeText.text = "種類：ボスエリア（大樹）"; break;
+    void UpdateMapUI(AreaType type) {
+        // 日本語をやめて英語表記にする（これで四角が消えます！）
+        areaProgressText.text = $"AREA {currentArea} / {maxArea}";
+    
+        switch (type) {
+            case AreaType.Battle: areaTypeText.text = "NEXT: BATTLE"; break;
+            case AreaType.Event: areaTypeText.text = "NEXT: EVENT"; break;
+            case AreaType.Companion: areaTypeText.text = "STATUS: START"; break;
+            case AreaType.Boss: areaTypeText.text = "NEXT: BOSS"; break;
         }
     }
+    
 }
