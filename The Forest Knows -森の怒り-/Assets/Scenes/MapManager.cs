@@ -1,13 +1,14 @@
 using UnityEngine;
-using TMPro;
 using System.Collections.Generic;
+using TMPro;
 
 public enum AreaType { Battle, Event, Companion, Boss }
 
 public class MapManager : MonoBehaviour {
     public static MapManager Instance;
 
-    [Header("UIテキスト")]
+    [Header("UIオブジェクト")]
+    public GameObject mapCanvas; // ★ マップのCanvas全体を登録する枠を追加
     public TextMeshProUGUI areaProgressText;
     public TextMeshProUGUI areaTypeText;
 
@@ -19,24 +20,26 @@ public class MapManager : MonoBehaviour {
     public int currentArea = 1;
     public int maxArea = 20;
 
-    // ★ 隠してある「BattleField」をインスペクターで繋ぐための枠
     [Header("連動オブジェクト")]
-    public GameObject battleField; 
+    public GameObject battleField;
+    public GameObject eventField; 
+    public GameObject gateBattle;  
+    public GameObject gateEvent;   
 
     void Awake() {
         Instance = this;
     }
 
     void Start() {
-        // 最初は敵フィールドを隠しておく
         if (battleField != null) battleField.SetActive(false);
-
+        if (eventField != null) eventField.SetActive(false);
+        SetGatesActive(true); 
         UpdateMapUI(AreaType.Companion);
     }
 
     public void AdvanceToNextArea(AreaType selectedType) {
         if (currentArea >= maxArea) {
-            Debug.Log("ゲームクリア");
+            Debug.Log("ゲームクリア！");
             return;
         }
 
@@ -50,26 +53,64 @@ public class MapManager : MonoBehaviour {
     }
 
     void TriggerAreaAction(AreaType type) {
-        // 次のエリアに移動した時、一旦敵フィールドは非表示にする
         if (battleField != null) battleField.SetActive(false);
+        if (eventField != null) eventField.SetActive(false);
 
         switch (type) {
             case AreaType.Battle:
-                Debug.Log($"エリア {currentArea}: 敵が出現");
-                // ★ 戦闘エリアに入ったので、隠していた敵（BattleField）を自動で表示！
-                if (battleField != null) battleField.SetActive(true);
+                Debug.Log($"エリア {currentArea}: 敵が出現！上のゲートを一時的に隠します。");
+                SetGatesActive(false);
+                if (battleField != null) {
+                    battleField.SetActive(true);
+                    battleField.transform.position = new Vector3(0f, -0.5f, 0f); // 少し下げた位置
+                    
+                    // 非アクティブになって眠っている子供の敵シンボルを強制的に復活させる
+                    EnemySymbol enemy = battleField.GetComponentInChildren<EnemySymbol>(true);
+                    if (enemy != null) {
+                        enemy.gameObject.SetActive(true);
+                    }
+                }
                 break;
 
             case AreaType.Event:
                 Debug.Log($"エリア {currentArea}: イベント発生");
+                SetGatesActive(true); 
+                if (eventField != null) {
+                    eventField.SetActive(true);
+                    eventField.transform.position = new Vector3(0f, -0.5f, 0f); 
+
+                    EventSymbol evSymbol = eventField.GetComponentInChildren<EventSymbol>(true);
+                    if (evSymbol != null) {
+                        evSymbol.gameObject.SetActive(true);
+                    }
+                }
                 break;
         }
     }
 
-    void UpdateMapUI(AreaType type) {
-        // 日本語をやめて英語表記にする（これで四角が消えます！）
-        areaProgressText.text = $"AREA {currentArea} / {maxArea}";
+    public void SetGatesActive(bool isActive) {
+        if (gateBattle != null) gateBattle.SetActive(isActive);
+        if (gateEvent != null) gateEvent.SetActive(isActive);
+    }
+
+    // ★ バトル開始時に、マップの文字UI（MapCanvas）の表示・非表示を切り替える関数
+    public void SetMapUIActive(bool isActive) {
+        if (mapCanvas != null) mapCanvas.SetActive(isActive);
+    }
+
+    public void OnBattleWin() {
+        Debug.Log("敵の撃破を確認。次のエリアへのゲートを出現させます！");
+        SetGatesActive(true); 
+    }
     
+    public void OnEventComplete() {
+        Debug.Log("イベント完了。次のゲートを出現させます！");
+        SetGatesActive(true); 
+    }
+
+    void UpdateMapUI(AreaType type) {
+        areaProgressText.text = $"AREA {currentArea} / {maxArea}";
+        
         switch (type) {
             case AreaType.Battle: areaTypeText.text = "NEXT: BATTLE"; break;
             case AreaType.Event: areaTypeText.text = "NEXT: EVENT"; break;
@@ -77,5 +118,4 @@ public class MapManager : MonoBehaviour {
             case AreaType.Boss: areaTypeText.text = "NEXT: BOSS"; break;
         }
     }
-    
 }

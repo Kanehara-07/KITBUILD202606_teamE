@@ -1,19 +1,10 @@
 using UnityEngine;
 
-public class EnemySymbol : MonoBehaviour
-{
-    public GameObject battleUI; // BattleCanvas（またはActionPanel）を繋ぐ枠
-
+public class EnemySymbol : MonoBehaviour {
     void OnTriggerEnter2D(Collider2D other) {
         if (other.CompareTag("Player")) {
-            Debug.Log($"敵とぶつかった！戦闘開始");
+            Debug.Log($"敵シンボルに接触！バトルに移行します。");
             
-            // バトル用のUI（通常攻撃ボタンなど）を表示する
-            if (battleUI != null) {
-                battleUI.SetActive(true);
-            }
-
-            // ★ シーンにいる BattleManager を探して、戦闘をスタートさせる
             BattleManager battleManager = FindObjectOfType<BattleManager>();
             if (battleManager != null) {
                 battleManager.BeginBattle();
@@ -23,5 +14,4 @@ public class EnemySymbol : MonoBehaviour
             gameObject.SetActive(false);
         }
     }
-    
 }

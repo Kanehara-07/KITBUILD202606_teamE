@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c5ea52988a6bc401e9f78a8484174555, type: 3}
   m_Name: ESTP_Data
   m_EditorClassIdentifier: Assembly-CSharp::MBTICharacterData
-  characterName: 
+  characterName: "\u8D77\u696D\u5BB6"
   mbtiType: 9
   maxHP: 3000
   attack: 2000

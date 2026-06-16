@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c5ea52988a6bc401e9f78a8484174555, type: 3}
   m_Name: INFJ_Data
   m_EditorClassIdentifier: Assembly-CSharp::MBTICharacterData
-  characterName: 
+  characterName: "\u63D0\u5531\u8005"
   mbtiType: 4
   maxHP: 3000
   attack: 2000
