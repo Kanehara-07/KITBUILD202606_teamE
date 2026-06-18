@@ -99,23 +99,23 @@ public class MapManager : MonoBehaviour {
     }
 
     public void OnBattleWin() {
-        Debug.Log("敵の撃破を確認。次のエリアへのゲートを出現させます！");
+        Debug.Log("敵の撃破！次のエリアへのゲートを出現させます。");
         SetGatesActive(true); 
     }
     
     public void OnEventComplete() {
-        Debug.Log("イベント完了。次のゲートを出現させます！");
+        Debug.Log("イベント完了！次のゲートを出現させます。");
         SetGatesActive(true); 
     }
 
     void UpdateMapUI(AreaType type) {
-        areaProgressText.text = $"AREA {currentArea} / {maxArea}";
+        areaProgressText.text = $"エリア {currentArea} / {maxArea}";
         
         switch (type) {
-            case AreaType.Battle: areaTypeText.text = "NEXT: BATTLE"; break;
-            case AreaType.Event: areaTypeText.text = "NEXT: EVENT"; break;
-            case AreaType.Companion: areaTypeText.text = "STATUS: START"; break;
-            case AreaType.Boss: areaTypeText.text = "NEXT: BOSS"; break;
+            case AreaType.Battle: areaTypeText.text = "エリア:バトル"; break;
+            case AreaType.Event: areaTypeText.text = "エリア: イベント"; break;
+            case AreaType.Companion: areaTypeText.text = "エリア: 始まり"; break;
+            case AreaType.Boss: areaTypeText.text = "エリア: ボス"; break;
         }
     }
 }

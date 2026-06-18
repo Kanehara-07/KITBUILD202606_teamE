@@ -15,8 +15,7 @@ using UnityEngine;
  * ↓
  * 次のエリアへ移動
  */
-public class AreaGate : MonoBehaviour
-{
+public class AreaGate : MonoBehaviour {
     /**
      * このゲートの遷移先エリアタイプ
      * Inspectorから設定する
@@ -35,8 +34,7 @@ public class AreaGate : MonoBehaviour
      * プレイヤーが触れた場合のみ
      * MapManagerにエリア遷移を依頼する
      */
-    void OnTriggerEnter2D(Collider2D other)
-    {
+    void OnTriggerEnter2D(Collider2D other) {
         // デバッグ用
         // ゲートに接触したオブジェクト名を表示する
         Debug.Log(
@@ -44,8 +42,7 @@ public class AreaGate : MonoBehaviour
         );
 
         // Playerタグを持つオブジェクトのみ反応
-        if (other.CompareTag("Player"))
-        {
+        if (other.CompareTag("Player")) {
             Debug.Log(
                 "[ゲート検証] Playerタグの判定に成功！エリアを進めます。"
             );
