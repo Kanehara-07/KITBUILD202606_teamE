@@ -18,3 +18,4 @@ MonoBehaviour:
   attack: 2000
   baseSpeed: 100
   starRank: 1
+  characterSprite: {fileID: -1052665767409569048, guid: 08247a55a26234395af973186270944c, type: 3}

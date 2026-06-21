@@ -1,321 +1,352 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 /**
- * 戦闘参加キャラクターのデータクラス
+ * 戦闘全体管理（新仕様版）
  *
- * 味方・敵の両方で使用する共通データ。
- * BattleManager が管理する。
+ * 仕様：
+ *   HP/MPの2ゲージ制
+ *   認知機能ストック（Ni〜Se）
+ *   トラウマシステム（劣等機能）
+ *   圧力（プレッシャー）
+ *   人格崩壊
+ *   スタレ風行動順（ActionValue方式）
  */
-[System.Serializable]
-public class BattleCharacter {
-    // キャラクター名
-    public string name;
-
-    // 現在HP
-    public int currentHP;
-
-    // 最大HP
-    public int maxHP;
-
-    // 行動速度
-    public int speed;
-
-    /**
-     * 行動値(Action Value)
-     *
-     * スタレ風の速度システムを簡易再現。
-     * 値が小さいキャラから行動する。
-     */
-    public float actionValue;
-
-    // 敵かどうか
-    public bool isEnemy;
-
-    /**
-     * ターン終了後に次回行動までの待機値を設定
-     *
-     * speed が高いほど早く次のターンが回ってくる。
-     */
-    public void ResetActionValue() {
-        actionValue = 10000f / speed;
-    }
-}
-
-/**
- * 戦闘全体を管理するクラス
- *
- * 主な役割
- * ・戦闘開始
- * ・ターン管理
- * ・行動処理
- * ・ダメージ計算
- * ・戦闘終了
- */
-public class BattleManager : MonoBehaviour {
-    /**
-     * 現在戦闘に参加しているキャラクター一覧
-     *
-     * 将来的には
-     * 味方4人 + 敵複数
-     * の構成になる予定
-     */
-    public List<BattleCharacter> participants = new List<BattleCharacter>();
-
+public class BattleManager : MonoBehaviour
+{
     [Header("UI設定")]
-
-    // 戦闘画面全体
     public GameObject battleCanvas;
-
-    // プレイヤーコマンドUI
     public GameObject actionPanel;
 
-    // 現在ターン中のキャラクター
-    private BattleCharacter currentTurnCharacter;
-
-    // 戦闘前にいたマップ上のプレイヤー
+    // 戦闘参加キャラ一覧
+    private List<BattleCharacterData> participants = new List<BattleCharacterData>();
+    private BattleCharacterData currentActor;   // 現在行動中のキャラ
     private GameObject playerMapObj;
 
-    /**
-     * 初期化
-     *
-     * ゲーム開始時は戦闘画面を非表示にする
-     */
-    void Start() {
-        if (battleCanvas != null)
-            battleCanvas.SetActive(false);
+    // ─── ライフサイクル ───────────────────────────────────────
+
+    void Start()
+    {
+        if (battleCanvas != null) battleCanvas.SetActive(false);
     }
 
-    //==================================================
-    // 戦闘開始処理
-    //==================================================
+    // ─── 戦闘開始 ─────────────────────────────────────────────
 
-    /**
-     * 戦闘開始
-     *
-     * マップを隠して戦闘画面へ切り替える
-     */
-    public void BeginBattle() {
-        // マップUIを非表示
-        if (MapManager.Instance != null) {
-            MapManager.Instance.SetMapUIActive(false);
-        }
+    public void BeginBattle()
+    {
+        if (MapManager.Instance != null) MapManager.Instance.SetMapUIActive(false);
 
-        // プレイヤーを一時的に非表示
         PlayerMapMovement movement = FindObjectOfType<PlayerMapMovement>();
+        if (movement != null) { playerMapObj = movement.gameObject; playerMapObj.SetActive(false); }
 
-        if (movement != null) {
-            playerMapObj = movement.gameObject;
-            playerMapObj.SetActive(false);
-        }
+        if (battleCanvas != null) battleCanvas.SetActive(true);
 
-        // 戦闘画面表示
-        if (battleCanvas != null)
-            battleCanvas.SetActive(true);
-
-        // 仮戦闘データ生成
-        SetupTestBattle();
-
-        // ターン進行開始
-        ProgressTurn();
+        SetupBattle();
+        StartCoroutine(BattleLoop());
     }
 
-    /**
-     * テスト用戦闘データ生成
-     *
-     * 将来的にはPartyManagerやEnemyDataから
-     * データを取得する予定
-     */
-    void SetupTestBattle() {
+    // ─── 戦闘データ構築 ───────────────────────────────────────
+
+    void SetupBattle()
+    {
         participants.Clear();
 
-        BattleCharacter player = new BattleCharacter {
-            name = "ENTP(味方)",
-            currentHP = 100,
-            maxHP = 100,
-            speed = 120,
-            isEnemy = false
-        };
+        // 味方：PartyManagerから編成済みキャラを取得
+        if (PartyManager.Instance != null)
+        {
+            var slots = PartyManager.Instance.GetPartySlots();
+            foreach (var oc in slots)
+            {
+                if (oc == null) continue;
+                var cd = PartyManager.Instance.characterDatabase.Find(c => c.id == oc.id);
 
-        player.ResetActionValue();
-        participants.Add(player);
+                var ally = new BattleCharacterData
+                {
+                    mbtiType    = oc.id,
+                    displayName = cd != null ? cd.jpName : oc.id,
+                    isEnemy     = false,
+                    maxHP       = 100 + (oc.rank - 1) * 30,
+                    maxMP       = 80,
+                    attack      = 25 + (oc.rank - 1) * 8,
+                    speed       = 100f,
+                };
+                ally.currentHP = ally.maxHP;
+                ally.currentMP = ally.maxMP;
 
-        BattleCharacter enemy = new BattleCharacter {
-            name = "森の動く切り株(敵)",
-            currentHP = 50,
-            maxHP = 50,
-            speed = 80,
-            isEnemy = true
-        };
+                var funcs = MBTICognitiveFunctions.Get(oc.id);
+                if (funcs != null) ally.traumaFunc = funcs.trauma;
 
-        enemy.ResetActionValue();
-        participants.Add(enemy);
-    }
-
-
-    // ターン管理
-
-    /**
-     * 次の行動キャラクターを決定
-     *
-     * actionValueが最も小さいキャラが行動する
-     */
-    void ProgressTurn() {
-        if (participants.Count == 0)
-            return;
-
-        BattleCharacter nextChar = participants[0];
-
-        foreach (var c in participants) {
-            if (c.actionValue < nextChar.actionValue) {
-                nextChar = c;
+                ally.ResetActionValue();
+                participants.Add(ally);
             }
         }
 
-        float reduction = nextChar.actionValue;
+        // 敵：仮データ（後でEnemyDataSOから取得する）
+        var enemy = new BattleCharacterData
+        {
+            mbtiType    = "ESTJ",
+            displayName = "森の切り株",
+            isEnemy     = true,
+            maxHP       = 200,
+            maxMP       = 100,
+            attack      = 20,
+            speed       = 80f,
+        };
+        enemy.currentHP = enemy.maxHP;
+        enemy.currentMP = enemy.maxMP;
+        var enemyFuncs  = MBTICognitiveFunctions.Get("ESTJ");
+        if (enemyFuncs != null) enemy.traumaFunc = enemyFuncs.trauma;
+        enemy.ResetActionValue();
+        participants.Add(enemy);
 
-        foreach (var c in participants) {
-            c.actionValue -= reduction;
-        }
-
-        currentTurnCharacter = nextChar;
-
-        ExecuteCharacterTurn(currentTurnCharacter);
-    }
-
-    /**
-     * キャラクターのターン実行
-     */
-    void ExecuteCharacterTurn(BattleCharacter character) {
-        // 戦闘不能ならスキップ
-        if (character.currentHP <= 0) {
-            ProgressTurn();
-            return;
-        }
-
-        Debug.Log(
-            $"【{character.name}】のターン！ (残りHP: {character.currentHP})"
-        );
-
-        // プレイヤーターン
-        if (!character.isEnemy) {
-            actionPanel.SetActive(true);
-        // 敵のターン
-        }else{
-            actionPanel.SetActive(false);
-
-            Debug.Log("敵の攻撃！");
-
-            BattleCharacter target =
-                participants.Find(c => !c.isEnemy);
-
-            target.currentHP -= 15;
-
-            character.ResetActionValue();
-
-            Invoke("ProgressTurn", 1.0f);
+        // UI初期化
+        if (BattleUIManager.Instance != null)
+        {
+            BattleUIManager.Instance.UpdateEnemyStatus(
+                enemy.displayName, enemy.currentHP, enemy.maxHP, enemy.currentMP, enemy.maxMP);
         }
     }
 
-    //==================================================
-    // プレイヤー操作
-    //==================================================
+    // ─── 戦闘ループ ───────────────────────────────────────────
 
-    /**
-     * 通常攻撃ボタン
-     */
+    IEnumerator BattleLoop()
+    {
+        while (true)
+        {
+            // 全員戦闘不能チェック
+            bool alliesAlive  = participants.Exists(c => !c.isEnemy && !c.IsDefeated());
+            bool enemiesAlive = participants.Exists(c =>  c.isEnemy && !c.IsDefeated());
+            if (!alliesAlive || !enemiesAlive)
+            {
+                EndBattle(enemiesAlive == false);
+                yield break;
+            }
+
+            // 次の行動者を決定
+            currentActor = GetNextActor();
+            AdvanceActionValues(currentActor.actionValue);
+            currentActor.ResetActionValue();
+
+            // UI更新（次の行動者）
+            UpdateUI();
+
+            if (!currentActor.isEnemy)
+            {
+                // 味方のターン → プレイヤー入力待ち
+                bool ultReady = currentActor.IsUltReady();
+                BattleUIManager.Instance?.ShowActionPanel(ultReady);
+                yield return new WaitUntil(() => actionPanel == null || !actionPanel.activeSelf);
+            }
+            else
+            {
+                // 敵のターン → 自動行動
+                BattleUIManager.Instance?.HideActionPanel();
+                yield return new WaitForSeconds(1.0f);
+                EnemyAction(currentActor);
+            }
+
+            yield return new WaitForSeconds(0.3f);
+        }
+    }
+
+    // ─── 行動順計算（スタレ風ActionValue方式） ───────────────
+
+    BattleCharacterData GetNextActor()
+    {
+        BattleCharacterData next = null;
+        foreach (var c in participants)
+        {
+            if (c.IsDefeated()) continue;
+            if (next == null || c.actionValue < next.actionValue) next = c;
+        }
+        return next;
+    }
+
+    void AdvanceActionValues(float reduction)
+    {
+        foreach (var c in participants)
+            if (!c.IsDefeated()) c.actionValue -= reduction;
+    }
+
+    // ─── UI更新 ───────────────────────────────────────────────
+
+    void UpdateUI()
+    {
+        if (BattleUIManager.Instance == null) return;
+
+        // 行動中味方のステータス
+        var ally = participants.Find(c => !c.isEnemy && !c.IsDefeated());
+        if (ally != null)
+        {
+            BattleUIManager.Instance.UpdatePlayerStatus(
+                ally.currentHP, ally.maxHP,
+                ally.currentMP, ally.maxMP,
+                ally.ultGauge / ally.ultCost);
+            BattleUIManager.Instance.SetPlayerSprite(ally.sprite);
+        }
+
+        // 敵ステータス
+        var enemy = participants.Find(c => c.isEnemy && !c.IsDefeated());
+        if (enemy != null)
+        {
+            BattleUIManager.Instance.UpdateEnemyStatus(
+                enemy.displayName, enemy.currentHP, enemy.maxHP, enemy.currentMP, enemy.maxMP);
+        }
+
+        // 次の行動者表示
+        var nextActor = GetNextActor();
+        if (nextActor != null && nextActor != currentActor)
+            BattleUIManager.Instance.UpdateTurnOrder(nextActor.displayName, nextActor.sprite);
+        else
+            BattleUIManager.Instance.UpdateTurnOrder(currentActor?.displayName ?? "");
+    }
+
+    // ─── プレイヤーコマンド ───────────────────────────────────
+
+    /// <summary>通常攻撃ボタンから呼ぶ</summary>
     public void OnAttackButtonPressed()
     {
-        if (currentTurnCharacter == null ||
-            currentTurnCharacter.isEnemy)
+        if (currentActor == null || currentActor.isEnemy) return;
+
+        var target = participants.Find(c => c.isEnemy && !c.IsDefeated());
+        if (target == null) return;
+
+        // HP/MPダメージ
+        int hpDmg = CalcDamage(currentActor.attack, pressureBonus: target.pressure);
+        int mpDmg = Mathf.RoundToInt(hpDmg * 0.5f);
+        target.TakeHPDamage(hpDmg);
+        bool collapsed = target.TakeMPDamage(mpDmg);
+
+        // 専門認知機能のストック蓄積
+        var funcs = MBTICognitiveFunctions.Get(currentActor.mbtiType);
+        if (funcs != null)
         {
-            return;
+            target.AddCogFuncStock(funcs.primary, 15f);
         }
 
-        Debug.Log("【通常攻撃】を実行！ 敵に20ダメージ！");
+        // 必殺ゲージ・圧力蓄積
+        currentActor.AddUltGauge(0.15f);
+        target.AddPressure(10f);
 
-        DamageEnemy(20);
+        BattleUIManager.Instance?.Log($"{currentActor.displayName} の通常攻撃！ HP-{hpDmg} MP-{mpDmg}");
+
+        if (collapsed)
+            BattleUIManager.Instance?.Log($"【人格崩壊】{target.displayName} が人格崩壊状態になった！");
+
+        UpdateUI();
+        BattleUIManager.Instance?.HideActionPanel();
     }
 
-    /**
-     * スキルボタン
-     *
-     * 現在は固定ダメージ
-     * 将来的にはMBTI固有スキルになる
-     */
-    public void OnSkillButtonPressed() {
-        if (currentTurnCharacter == null ||
-            currentTurnCharacter.isEnemy)
+    /// <summary>スキルボタンから呼ぶ</summary>
+    public void OnSkillButtonPressed()
+    {
+        if (currentActor == null || currentActor.isEnemy) return;
+
+        var target = participants.Find(c => c.isEnemy && !c.IsDefeated());
+        if (target == null) return;
+
+        int hpDmg = CalcDamage(currentActor.attack * 2, pressureBonus: target.pressure);
+        int mpDmg = Mathf.RoundToInt(hpDmg * 0.8f);
+        target.TakeHPDamage(hpDmg);
+        bool collapsed = target.TakeMPDamage(mpDmg);
+
+        var funcs = MBTICognitiveFunctions.Get(currentActor.mbtiType);
+        if (funcs != null)
         {
-            return;
+            target.AddCogFuncStock(funcs.primary, 30f);
+            target.AddCogFuncStock(funcs.secondary, 15f);
         }
 
-        Debug.Log(
-            "【スキル：???】を発動！ 35ダメージ！"
-        );
+        currentActor.AddUltGauge(0.25f);
+        target.AddPressure(20f);
 
-        DamageEnemy(35);
+        BattleUIManager.Instance?.Log($"{currentActor.displayName} のスキル発動！ HP-{hpDmg} MP-{mpDmg}");
+
+        if (collapsed)
+            BattleUIManager.Instance?.Log($"【人格崩壊】{target.displayName} が崩壊状態に！");
+
+        UpdateUI();
+        BattleUIManager.Instance?.HideActionPanel();
     }
 
-    //==================================================
-    // ダメージ処理
-    //==================================================
+    /// <summary>必殺技ボタンから呼ぶ</summary>
+    public void OnUltButtonPressed()
+    {
+        if (currentActor == null || currentActor.isEnemy) return;
+        if (!currentActor.IsUltReady()) return;
 
-    /**
-     * 敵にダメージを与える
-     */
-    void DamageEnemy(int damage) {
-        BattleCharacter enemyTarget =
-            participants.Find(c => c.isEnemy);
+        var target = participants.Find(c => c.isEnemy && !c.IsDefeated());
+        if (target == null) return;
 
-        enemyTarget.currentHP -= damage;
+        int hpDmg = CalcDamage(currentActor.attack * 3, pressureBonus: target.pressure);
+        int mpDmg = Mathf.RoundToInt(hpDmg * 1.2f);
+        target.TakeHPDamage(hpDmg);
+        bool collapsed = target.TakeMPDamage(mpDmg);
 
-        actionPanel.SetActive(false);
-
-        // 敵撃破
-        if (enemyTarget.currentHP <= 0) {
-            EndBattle();
-            return;
+        // トラウマチェック（必殺技の認知機能が敵のトラウマと一致するか）
+        var funcs = MBTICognitiveFunctions.Get(currentActor.mbtiType);
+        if (funcs != null && !target.traumaTriggered)
+        {
+            if (funcs.primary == target.traumaFunc || funcs.secondary == target.traumaFunc)
+            {
+                target.traumaRevealed  = true;
+                target.traumaTriggered = true;
+                target.AddPressure(40f);
+                BattleUIManager.Instance?.Log($"【トラウマ発動】{target.displayName} のトラウマを刺激した！圧力+40！");
+            }
         }
 
-        currentTurnCharacter.ResetActionValue();
+        currentActor.ultGauge = 0f; // ゲージリセット
+        target.AddPressure(30f);
 
-        ProgressTurn();
+        BattleUIManager.Instance?.Log($"【必殺技】{currentActor.displayName}！ HP-{hpDmg} MP-{mpDmg}");
+
+        if (collapsed)
+            BattleUIManager.Instance?.Log($"【人格崩壊】{target.displayName} 崩壊！");
+
+        UpdateUI();
+        BattleUIManager.Instance?.HideActionPanel();
     }
 
-    //==================================================
-    // 戦闘終了処理
-    //==================================================
+    // ─── 敵の行動 ─────────────────────────────────────────────
 
-    /**
-     * 勝利時の処理
-     *
-     * マップへ戻り、
-     * MapManagerへ勝利通知を送る
-     */
-    void EndBattle() {
-        Debug.Log("--- 戦闘終了！勝利！ ---");
+    void EnemyAction(BattleCharacterData enemy)
+    {
+        var target = participants.Find(c => !c.isEnemy && !c.IsDefeated());
+        if (target == null) return;
 
-        // 戦闘画面を閉じる
-        if (battleCanvas != null) {
-            battleCanvas.SetActive(false);
-        }
+        int dmg = CalcDamage(enemy.attack, pressureBonus: 0);
+        target.TakeHPDamage(dmg);
+        target.TakeMPDamage(Mathf.RoundToInt(dmg * 0.3f));
+        target.AddUltGauge(0.1f); // 被弾で必殺ゲージ増加
 
-        // プレイヤーを再表示
-        if (playerMapObj != null) {
+        BattleUIManager.Instance?.Log($"{enemy.displayName} の攻撃！ {target.displayName} に {dmg} ダメージ！");
+        UpdateUI();
+    }
+
+    // ─── ダメージ計算 ─────────────────────────────────────────
+
+    int CalcDamage(int baseAtk, float pressureBonus)
+    {
+        // 圧力が高いほどダメージUP（最大50%増）
+        float pressureMult = 1f + (pressureBonus / 100f) * 0.5f;
+        return Mathf.RoundToInt(baseAtk * pressureMult);
+    }
+
+    // ─── 戦闘終了 ─────────────────────────────────────────────
+
+    void EndBattle(bool playerWon)
+    {
+        Debug.Log(playerWon ? "--- 勝利！ ---" : "--- 敗北... ---");
+
+        if (battleCanvas != null) battleCanvas.SetActive(false);
+        if (playerMapObj != null)
+        {
             playerMapObj.SetActive(true);
-
-            playerMapObj
-                .GetComponent<PlayerMapMovement>()
-                .enabled = true;
+            playerMapObj.GetComponent<PlayerMapMovement>().enabled = true;
         }
-
-        // マップUIを再表示
-        if (MapManager.Instance != null) {
-            MapManager.Instance.SetMapUIActive(true);
-        }
-
-        // エリア管理へ勝利通知
-        MapManager.Instance.OnBattleWin();
+        if (MapManager.Instance != null) MapManager.Instance.SetMapUIActive(true);
+        if (playerWon) MapManager.Instance?.OnBattleWin();
     }
 }
